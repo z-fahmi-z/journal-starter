@@ -74,12 +74,14 @@ jobs:
         with:
           push: false
           tags: ${{ steps.meta.outputs.tags }}
+        working-directory: ./api
 
       - name: Push Docker image
         uses: docker/build-push-action@v6
         with:
           push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ steps.meta.outputs.tags }}
+        working-directory: ./api
 
   # Continuous Deployment
   cd-fastapi:
