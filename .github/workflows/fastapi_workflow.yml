@@ -72,16 +72,16 @@ jobs:
       - name: Build Docker image 
         uses: docker/build-push-action@v6
         with:
-          context: .
-          file: ./api/Dockerfile    
+          context: ./api
+          file: Dockerfile    
           push: false
           tags: ${{ steps.meta.outputs.tags }}
 
       - name: Push Docker image
         uses: docker/build-push-action@v6
         with:
-          context: .
-          file: ./api/Dockerfile    
+          context: ./api
+          file: Dockerfile    
           push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ steps.meta.outputs.tags }}
 
