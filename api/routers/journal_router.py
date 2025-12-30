@@ -8,7 +8,6 @@ from models.entry import Entry, EntryCreate
 
 router = APIRouter()
 
-
 async def get_entry_service() -> AsyncGenerator[EntryService, None]:
     async with PostgresDB() as db:
         yield EntryService(db)
