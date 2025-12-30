@@ -12,10 +12,10 @@
   
   "service": "devcontainer",
   "workspaceFolder": "/workspaces/",
-  "runServices": ["postgres"]
+  "runServices": ["postgres"],
   
   // Use 'forwardPorts' to make a list of ports inside the container available locally.
-	// "forwardPorts": [],
+	"forwardPorts": [5432]
 
   // Configure tool-specific properties.
 	// "customizations": {},
