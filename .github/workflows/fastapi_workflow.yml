@@ -23,7 +23,7 @@ jobs:
           architecture: x64
 
       - name: Install Python project dependencies
-        run: pip install -r requirement.txt
+        run: pip install -r requirements.txt
         working-directory: ./api
 
       - name: Run pytest
