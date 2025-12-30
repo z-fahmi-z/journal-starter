@@ -1,0 +1,72 @@
+name: Career Journal API CI/CD
+
+## Define trigger points involved 
+on:
+  push:
+    paths:
+      - api/**
+      - .github/workflows/fastapi-workflow.yml
+    branches: [feature/cicd-pipeline]
+
+jobs:
+  # Continuous Integration
+  ci-fastapi:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Prepare CI repo
+        uses: actions/checkout@v2
+
+      - name: Setup Python env
+        uses: actions/setup-python@v2
+        with:
+          python-version: 3.12.11
+          architecture: x64
+
+      - name: Install Python project dependencies
+        run: pip install -r requirement.txt
+        working-directory: ./api
+
+      - name: Run pytest
+        run: pytest -v --cov=app
+        working-directory: .
+
+  build-and-push:
+    needs:
+      - ci-fastapi
+    runs-on: ubuntu-latest
+    steps:
+      - name: Prepare Docker repo
+        uses: actions/checkout@v4
+
+      - name: Extract image metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ vars.DOCKER_USERNAME }}/journal_api
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ vars.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Build Docker image 
+        uses: docker/build-push-action@v6
+        with:
+          push: false
+          tags: ${{ steps.meta.outputs.tags }}
+
+      - name: Push Docker image
+        uses: docker/build-push-action@v6
+        with:
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ steps.meta.outputs.tags }}
+
+  # Continuous Deployment
+  cd-fastapi:
+    needs: 
+      - ci-fastapi
+      - build-and-push
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
