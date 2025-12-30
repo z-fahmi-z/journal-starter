@@ -4,6 +4,7 @@ name: Career Journal API CI/CD
 on:
   push:
     paths:
+      - .devcontainer/**
       - api/**
       - .github/workflows/**
     branches: [feature/cicd-pipeline]
