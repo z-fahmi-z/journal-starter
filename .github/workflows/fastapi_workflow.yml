@@ -40,6 +40,8 @@ jobs:
       
       - name: Run pytest
         run: pytest -v --cov=app
+        env:
+          DATABASE_URL: ${{ PYTEST_DATABASE_URL }}
         working-directory: .
 
       - name: Tear down compose setup
