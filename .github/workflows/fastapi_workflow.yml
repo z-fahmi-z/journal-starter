@@ -5,7 +5,7 @@ on:
   push:
     paths:
       - api/**
-      - .github/workflows/fastapi-workflow.yml
+      - .github/workflows/**
     branches: [feature/cicd-pipeline]
 
 jobs:
