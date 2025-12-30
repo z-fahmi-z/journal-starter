@@ -16,6 +16,17 @@ jobs:
       - name: Prepare CI repo
         uses: actions/checkout@v2
 
+      - name: Create .env file from sample
+        run: cp .env-sample .env
+        working-directory: .
+
+      - name: Setup Docker Compose
+        uses: docker/setup-compose-action@v1
+
+      - name: Spin up Postgres test database container
+        run: docker compose up -d
+        working-directory: ./.devcontainer
+      
       - name: Setup Python env
         uses: actions/setup-python@v2
         with:
@@ -25,10 +36,15 @@ jobs:
       - name: Install Python project dependencies
         run: pip install -r requirements.txt
         working-directory: ./api
-
+      
       - name: Run pytest
         run: pytest -v --cov=app
         working-directory: .
+
+      - name: Tear down compose setup
+        if: always()
+        run: docker compose down
+        working-directory: ./.devcontainer
 
   build-and-push:
     needs:
