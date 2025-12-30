@@ -62,7 +62,9 @@ jobs:
         uses: docker/metadata-action@v5
         with:
           images: ${{ vars.DOCKER_USERNAME }}/journal_api
-
+        tags: |
+           type=sha
+           
       - name: Log in to Docker Hub
         uses: docker/login-action@v3
         with:
@@ -83,7 +85,7 @@ jobs:
           context: ./api
           file: ./api/Dockerfile    
           push: ${{ github.event_name != 'pull_request' }}
-          tags: ${{ steps.meta.outputs.tags }}
+          tags: ${{ steps.meta.outputs.tags }}       
 
   # Continuous Deployment
   cd-fastapi:
