@@ -12,6 +12,9 @@ Set OPENAI_API_KEY, and optionally OPENAI_BASE_URL and OPENAI_MODEL
 in your .env file. Settings are loaded by ``api.config.Settings``.
 """
 
+import json
+from datetime import UTC, datetime
+
 from openai import AsyncOpenAI
 
 from api.config import get_settings
@@ -62,7 +65,39 @@ async def analyze_journal_entry(
       4. Parse the assistant's JSON response with ``json.loads()``.
       5. Return a dict with ``entry_id``, ``sentiment``, ``summary``, ``topics``.
     """
-    raise NotImplementedError(
-        "Task 4: implement analyze_journal_entry using the openai SDK. "
-        "See tests/test_llm_service.py for the test contract."
+
+    if client is None:
+        client = _default_client()
+
+    model = "gpt-5.4-nano"
+    prompt_template = f"""
+    # You are a helpful assistant that analyzes journal entries with these parameters
+    # Args:
+        entry_text: Combined work + struggle + intention text.
+    # User Input:
+        entry_text: {entry_text}
+    # Output format JSON response:
+    {{
+        "sentiment": str,   # "positive" | "negative" | "neutral"
+        "summary":   str,
+        "topics":    list[str],
+    }}
+    # Rules:
+    - Do not include any text outside the JSON response.
+    - No emojis, markdown formatting, or explanations.
+    - Do not miss any JSON output keys mentioned above.
+    """
+
+    response = await client.chat.completions.create(
+        model=model, temperature=0.8, messages=[{"role": "user", "content": prompt_template}]
     )
+    assistant_raw_message = response.choices[0].message.content
+
+    if assistant_raw_message is None:
+        raise ValueError("Model returned empty content")
+
+    analysis = json.loads(assistant_raw_message)
+    analysis["entry_id"] = entry_id
+    analysis["created_at"] = datetime.now(UTC).isoformat()
+
+    return analysis
