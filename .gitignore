@@ -171,4 +171,4 @@ cython_debug/
 .pypirc
 
 # Dev Container
-devcontainer-lock.json
+*/devcontainer-lock.json
