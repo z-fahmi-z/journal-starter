@@ -87,7 +87,7 @@ jobs:
         run: |
           PGPASSWORD=postgres psql \
             -h localhost -U postgres -d career_journal \
-            -f database_setup.sql
+            -f ./db/database_setup.sql
 
       - name: Run tests
         run: uv run pytest -v

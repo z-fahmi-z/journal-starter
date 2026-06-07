@@ -1,0 +1,26 @@
+services:
+  journal-api:
+      image: local/journal-api:latest
+      ports: 
+        - "8080:8080"
+      env_file: ["../.env"]
+      depends_on:
+        db:
+          condition: service_healthy
+
+  db:
+    image: postgres:15
+    ports:
+      - "5432:5432"
+    env_file: ["../.env"]
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ../db/database_setup.sql:/docker-entrypoint-initdb.d/database_setup.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER}"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+volumes:
+  postgres_data:
