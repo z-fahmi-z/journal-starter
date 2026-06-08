@@ -13,3 +13,7 @@ module "vpc" {
   availability_zones    = var.availability_zones
   aws_region            = var.aws_region
 }
+
+module "ecr" {
+  source = "./modules/ecr"
+}
