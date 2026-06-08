@@ -18,7 +18,7 @@ locals {
   }
 }
 
-resource "aws_vpc" "main" {
+resource "aws_vpc" "this" {
   cidr_block           = var.vpc_cidr
   enable_dns_support   = true
   enable_dns_hostnames = true
@@ -28,8 +28,8 @@ resource "aws_vpc" "main" {
   })
 }
 
-resource "aws_internet_gateway" "main" {
-  vpc_id = aws_vpc.main.id
+resource "aws_internet_gateway" "this" {
+  vpc_id = aws_vpc.this.id
 
   tags = merge(local.project_tag, {
     Name = "igw-journal"
@@ -38,7 +38,7 @@ resource "aws_internet_gateway" "main" {
 
 resource "aws_subnet" "public" {
   for_each          = local.public_subnets
-  vpc_id            = aws_vpc.main.id
+  vpc_id            = aws_vpc.this.id
   cidr_block        = each.value
   availability_zone = var.availability_zones[tonumber(each.key)]
 
@@ -49,7 +49,7 @@ resource "aws_subnet" "public" {
 
 resource "aws_subnet" "private" {
   for_each          = local.private_subnets
-  vpc_id            = aws_vpc.main.id
+  vpc_id            = aws_vpc.this.id
   cidr_block        = each.value
   availability_zone = var.availability_zones[tonumber(each.key)]
 
@@ -60,7 +60,7 @@ resource "aws_subnet" "private" {
 
 resource "aws_subnet" "database" {
   for_each          = local.database_subnets
-  vpc_id            = aws_vpc.main.id
+  vpc_id            = aws_vpc.this.id
   cidr_block        = each.value
   availability_zone = var.availability_zones[tonumber(each.key)]
 
@@ -89,7 +89,7 @@ resource "aws_nat_gateway" "nat_gw" {
 # single route table pointing to the internet gateway for both public subnet
 #
 resource "aws_route_table" "public_rt" {
-  vpc_id = aws_vpc.main.id
+  vpc_id = aws_vpc.this.id
 
   tags = merge(local.project_tag, {
     Name = "public-rt-journal"
@@ -99,7 +99,7 @@ resource "aws_route_table" "public_rt" {
 resource "aws_route" "public_internet_access" {
   route_table_id         = aws_route_table.public_rt.id
   destination_cidr_block = "0.0.0.0/0"
-  gateway_id             = aws_internet_gateway.main.id
+  gateway_id             = aws_internet_gateway.this.id
 }
 
 resource "aws_route_table_association" "public" {
@@ -113,7 +113,7 @@ resource "aws_route_table_association" "public" {
 #
 resource "aws_route_table" "private_rt" {
   for_each = aws_subnet.private
-  vpc_id   = aws_vpc.main.id
+  vpc_id   = aws_vpc.this.id
 
   tags = merge(local.project_tag, {
     Name = "private-rt-${each.key}-journal"
@@ -138,7 +138,7 @@ resource "aws_route_table_association" "private" {
 #
 resource "aws_route_table" "database_rt" {
   for_each = aws_subnet.database
-  vpc_id   = aws_vpc.main.id
+  vpc_id   = aws_vpc.this.id
 
   tags = merge(local.project_tag, {
     Name = "database-rt-${each.key}-journal"
