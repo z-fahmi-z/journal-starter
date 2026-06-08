@@ -5,10 +5,10 @@ services:
         - "8080:8080"
       env_file: ["../.env"]
       depends_on:
-        db:
+        postgres:
           condition: service_healthy
 
-  db:
+  postgres:
     image: postgres:15
     ports:
       - "5432:5432"
