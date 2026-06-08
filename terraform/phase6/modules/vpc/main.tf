@@ -14,7 +14,7 @@ locals {
 
   project_tag = {
     deployment_id = var.deployment_id
-    project = "cloud-api"
+    project       = "cloud-api"
   }
 }
 
@@ -24,7 +24,7 @@ resource "aws_vpc" "main" {
   enable_dns_hostnames = true
 
   tags = merge(local.project_tag, {
-    Name    = "vpc-journal"
+    Name = "vpc-journal"
   })
 }
 
@@ -32,7 +32,7 @@ resource "aws_internet_gateway" "main" {
   vpc_id = aws_vpc.main.id
 
   tags = merge(local.project_tag, {
-    Name    = "igw-journal"
+    Name = "igw-journal"
   })
 }
 
@@ -43,7 +43,7 @@ resource "aws_subnet" "public" {
   availability_zone = var.availability_zones[tonumber(each.key)]
 
   tags = merge(local.project_tag, {
-    Name    = "public-subnet-${each.key}-journal"
+    Name = "public-subnet-${each.key}-journal"
   })
 }
 
@@ -54,7 +54,7 @@ resource "aws_subnet" "private" {
   availability_zone = var.availability_zones[tonumber(each.key)]
 
   tags = merge(local.project_tag, {
-    Name    = "private-subnet-${each.key}-journal"
+    Name = "private-subnet-${each.key}-journal"
   })
 }
 
@@ -64,8 +64,8 @@ resource "aws_subnet" "database" {
   cidr_block        = each.value
   availability_zone = var.availability_zones[tonumber(each.key)]
 
-  tags = merge(local.project_tag, { 
-    Name    = "database-subnet-${each.key}-journal"
+  tags = merge(local.project_tag, {
+    Name = "database-subnet-${each.key}-journal"
   })
 }
 
@@ -81,7 +81,7 @@ resource "aws_nat_gateway" "nat_gw" {
   subnet_id     = each.value.id
 
   tags = merge(local.project_tag, {
-    Name    = "nat-gw-${each.key}-journal"
+    Name = "nat-gw-${each.key}-journal"
   })
 }
 
@@ -92,7 +92,7 @@ resource "aws_route_table" "public_rt" {
   vpc_id = aws_vpc.main.id
 
   tags = merge(local.project_tag, {
-    Name    = "public-rt-journal"
+    Name = "public-rt-journal"
   })
 }
 
@@ -116,7 +116,7 @@ resource "aws_route_table" "private_rt" {
   vpc_id   = aws_vpc.main.id
 
   tags = merge(local.project_tag, {
-    Name    = "private-rt-${each.key}-journal"
+    Name = "private-rt-${each.key}-journal"
   })
 }
 
@@ -141,7 +141,7 @@ resource "aws_route_table" "database_rt" {
   vpc_id   = aws_vpc.main.id
 
   tags = merge(local.project_tag, {
-    Name    = "database-rt-${each.key}-journal"
+    Name = "database-rt-${each.key}-journal"
   })
 }
 
