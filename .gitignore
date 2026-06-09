@@ -172,7 +172,3 @@ cython_debug/
 
 # Dev Container
 */devcontainer-lock.json
-
-# Terraform
-*.terraform.lock.hcl
-.terraform/
