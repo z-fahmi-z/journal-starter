@@ -1,0 +1,8 @@
+# Ignore everything
+*
+
+# But allow specific directories and files (using ! to negate)
+!api/
+!pyproject.toml
+!README.md
+!Dockerfile
