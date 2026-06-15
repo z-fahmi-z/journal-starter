@@ -1,20 +1,8 @@
-"""Task 4: Implement analyze_journal_entry using any OpenAI-compatible API.
-
-This project mandates the OpenAI Python SDK, which works with:
-  - GitHub Models (default, free, no credit card required)
-  - OpenAI proper
-  - Azure OpenAI
-  - Groq, Together, OpenRouter, Fireworks, DeepInfra
-  - Ollama, LM Studio, vLLM (local)
-  - Anthropic via their OpenAI-compat endpoint
-
-Set OPENAI_API_KEY, and optionally OPENAI_BASE_URL and OPENAI_MODEL
-in your .env file. Settings are loaded by ``api.config.Settings``.
-"""
-
 import json
 from datetime import UTC, datetime
 
+import boto3
+from botocore.exceptions import BotoCoreError, NoCredentialsError
 from openai import AsyncOpenAI
 
 from api.config import get_settings
@@ -33,44 +21,97 @@ def _default_client() -> AsyncOpenAI:
     )
 
 
-async def analyze_journal_entry(
-    entry_id: str,
-    entry_text: str,
-    client: AsyncOpenAI | None = None,
+def _is_cloud_native() -> bool:
+    """Return True if cloud-native mode is enabled (use Bedrock with DeepSeek)."""
+    settings = get_settings()
+    return getattr(settings, "cloud_native", False)
+
+
+def _bedrock_available() -> bool:
+    """Return True if AWS Bedrock is reachable with the current credentials."""
+    if not _is_cloud_native():
+        return False
+
+    try:
+        boto3.client("bedrock", region_name=get_settings().aws_region).list_foundation_models()
+        return True
+    except BotoCoreError, NoCredentialsError, Exception:
+        return False
+
+
+async def _analyze_with_bedrock(entry_id: str, entry_text: str) -> dict:
+    """Run the journal analysis via AWS Bedrock (DeepSeek model on Bedrock)."""
+    settings = get_settings()
+    bedrock = boto3.client("bedrock-runtime", region_name=settings.aws_region)
+
+    prompt_template = _build_prompt(entry_text)
+
+    # DeepSeek model on Bedrock uses a different API format
+    # Using the converse API format which works with DeepSeek models
+    body = json.dumps(
+        {
+            "messages": [{"role": "user", "content": [{"text": prompt_template}]}],
+            "inferenceConfig": {
+                "maxTokens": 1024,
+                "temperature": 0.8,
+            },
+        }
+    )
+
+    response = bedrock.invoke_model(
+        modelId=settings.bedrock_model_id,
+        body=body,
+        contentType="application/json",
+        accept="application/json",
+    )
+
+    raw = json.loads(response["body"].read())
+
+    # Extract the response text based on DeepSeek's response format
+    assistant_raw_message = (
+        raw.get("output", {}).get("message", {}).get("content", [{}])[0].get("text", "")
+    )
+
+    if not assistant_raw_message:
+        raise ValueError("Bedrock returned empty content")
+
+    analysis = json.loads(assistant_raw_message)
+    analysis["entry_id"] = entry_id
+    analysis["created_at"] = datetime.now(UTC).isoformat()
+    analysis["model"] = "bedrock-deepseek"
+    return analysis
+
+
+async def _analyze_with_openai(
+    entry_id: str, entry_text: str, client: AsyncOpenAI | None = None
 ) -> dict:
-    """Analyze a journal entry using an OpenAI-compatible LLM.
-
-    Args:
-        entry_id: ID of the entry being analyzed (pass through to the result).
-        entry_text: Combined work + struggle + intention text.
-        client: OpenAI client. If None, a default one is constructed from
-            application settings. Tests pass in a MockAsyncOpenAI here; production code
-            in the router calls this with no ``client`` argument.
-
-    Returns:
-        A dict matching AnalysisResponse:
-            {
-                "entry_id":  str,
-                "sentiment": str,   # "positive" | "negative" | "neutral"
-                "summary":   str,
-                "topics":    list[str],
-            }
-
-    TODO (Task 4):
-      1. If ``client is None``, call ``_default_client()`` to construct one.
-      2. Build a messages list that includes ``entry_text`` somewhere
-         (the unit tests check that the entry text reaches the LLM).
-      3. Call ``client.chat.completions.create(...)`` with a model name
-         (use ``get_settings().openai_model`` — defaults to "gpt-4o-mini").
-      4. Parse the assistant's JSON response with ``json.loads()``.
-      5. Return a dict with ``entry_id``, ``sentiment``, ``summary``, ``topics``.
-    """
-
+    """Run the journal analysis via OpenAI-compatible endpoint (for local development)."""
     if client is None:
         client = _default_client()
 
-    model = "gpt-5.4-nano"
-    prompt_template = f"""
+    settings = get_settings()
+    model = settings.openai_model or "gpt-4o-mini"
+
+    response = await client.chat.completions.create(
+        model=model,
+        temperature=0.8,
+        messages=[{"role": "user", "content": _build_prompt(entry_text)}],
+    )
+    assistant_raw_message = response.choices[0].message.content
+
+    if assistant_raw_message is None:
+        raise ValueError("Model returned empty content")
+
+    analysis = json.loads(assistant_raw_message)
+    analysis["entry_id"] = entry_id
+    analysis["created_at"] = datetime.now(UTC).isoformat()
+    analysis["model"] = "openai-compatible"
+    return analysis
+
+
+def _build_prompt(entry_text: str) -> str:
+    """Shared prompt used by both the OpenAI and Bedrock paths."""
+    return f"""
     # You are a helpful assistant that analyzes journal entries with these parameters
     # Args:
         entry_text: Combined work + struggle + intention text.
@@ -88,16 +129,18 @@ async def analyze_journal_entry(
     - Do not miss any JSON output keys mentioned above.
     """
 
-    response = await client.chat.completions.create(
-        model=model, temperature=0.8, messages=[{"role": "user", "content": prompt_template}]
-    )
-    assistant_raw_message = response.choices[0].message.content
 
-    if assistant_raw_message is None:
-        raise ValueError("Model returned empty content")
+async def analyze_journal_entry(
+    entry_id: str,
+    entry_text: str,
+    client: AsyncOpenAI | None = None,
+) -> dict:
+    """Analyze a journal entry using either Bedrock (DeepSeek) or OpenAI-compatible LLM."""
 
-    analysis = json.loads(assistant_raw_message)
-    analysis["entry_id"] = entry_id
-    analysis["created_at"] = datetime.now(UTC).isoformat()
-
-    return analysis
+    if _is_cloud_native():
+        # Cloud-native mode: Use AWS Bedrock with DeepSeek
+        if not _bedrock_available():
+            raise RuntimeError("Cannot reach AWS Bedrock service.")
+        return await _analyze_with_bedrock(entry_id, entry_text)
+    # Local development mode: Use OpenAI-compatible endpoint
+    return await _analyze_with_openai(entry_id, entry_text, client)
