@@ -1,6 +1,7 @@
 from functools import lru_cache
+from urllib.parse import quote_plus
 
-from pydantic import Field
+from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -16,8 +17,28 @@ class Settings(BaseSettings):
     in ``.env`` populates ``database_url`` on this model.
     """
 
-    database_url: str = Field(
-        description="PostgreSQL connection URL (e.g. postgresql://user:pass@host:5432/db).",
+    postgres_user: str = Field(
+        default="postgres",
+        description="PostgreSQL database username.",
+    )
+    postgres_password: str = Field(
+        description="PostgreSQL database password.",
+    )
+    postgres_db: str = Field(
+        default="career_journal",
+        description="PostgreSQL database name.",
+    )
+    postgres_host: str = Field(
+        description="PostgreSQL database host.",
+    )
+    postgres_port: int = Field(
+        default=5432,
+        description="PostgreSQL database port.",
+    )
+
+    database_url: str | None = Field(
+        default=None,
+        description="PostgreSQL connection URL (computed from POSTGRES_* variables).",
     )
     cloud_native: bool = Field(
         default=False,
@@ -56,6 +77,34 @@ class Settings(BaseSettings):
         env_file_encoding="utf-8",
         extra="ignore",
     )
+
+    @field_validator("database_url", mode="before")
+    @classmethod
+    def build_database_url(cls, v, info):
+        """Build DATABASE_URL from individual POSTGRES_* components if not provided."""
+        if v:
+            return v
+
+        # Get values from the data being validated
+        data = info.data
+
+        user = data.get("postgres_user")
+        password = data.get("postgres_password")
+        host = data.get("postgres_host")
+        port = data.get("postgres_port", 5432)
+        db = data.get("postgres_db")
+
+        # Validate required fields
+        if not all([user, password, host, db]):
+            raise ValueError(
+                "Cannot build database_url: missing required POSTGRES_* environment variables. "
+                "Need POSTGRES_USER, POSTGRES_PASSWORD, POSTGRES_HOST, and POSTGRES_DB."
+            )
+
+        # Build the URL
+        encoded_password = quote_plus(password)
+
+        return f"postgresql://{user}:{encoded_password}@{host}:{port}/{db}"
 
 
 @lru_cache
