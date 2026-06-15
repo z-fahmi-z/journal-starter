@@ -21,6 +21,7 @@ from openai import AsyncOpenAI
 
 from api.config import get_settings
 
+
 def _default_client() -> AsyncOpenAI:
     """Construct the real OpenAI client from application settings.
 
@@ -33,13 +34,15 @@ def _default_client() -> AsyncOpenAI:
         base_url=settings.openai_base_url,
     )
 
+
 def _bedrock_available() -> bool:
     """Return True if AWS Bedrock is reachable with the current credentials."""
     try:
         boto3.client("bedrock", region_name="us-east-1").list_foundation_models()
         return True
-    except (BotoCoreError, NoCredentialsError, Exception):
+    except BotoCoreError, NoCredentialsError, Exception:
         return False
+
 
 async def _analyze_with_bedrock(entry_id: str, entry_text: str) -> dict:
     """Run the journal analysis via AWS Bedrock (Claude on Bedrock)."""
@@ -47,12 +50,14 @@ async def _analyze_with_bedrock(entry_id: str, entry_text: str) -> dict:
 
     prompt_template = _build_prompt(entry_text)
 
-    body = json.dumps({
-        "anthropic_version": "bedrock-2023-05-31",
-        "max_tokens": 1024,
-        "temperature": 0.8,
-        "messages": [{"role": "user", "content": prompt_template}],
-    })
+    body = json.dumps(
+        {
+            "anthropic_version": "bedrock-2023-05-31",
+            "max_tokens": 1024,
+            "temperature": 0.8,
+            "messages": [{"role": "user", "content": prompt_template}],
+        }
+    )
 
     response = bedrock.invoke_model(
         modelId="anthropic.claude-3-haiku-20240307-v1:0",
@@ -70,7 +75,8 @@ async def _analyze_with_bedrock(entry_id: str, entry_text: str) -> dict:
     analysis = json.loads(assistant_raw_message)
     analysis["entry_id"] = entry_id
     analysis["created_at"] = datetime.now(UTC).isoformat()
-    return analysis   
+    return analysis
+
 
 def _build_prompt(entry_text: str) -> str:
     """Shared prompt used by both the OpenAI and Bedrock paths."""
@@ -91,6 +97,7 @@ def _build_prompt(entry_text: str) -> str:
     - No emojis, markdown formatting, or explanations.
     - Do not miss any JSON output keys mentioned above.
     """
+
 
 async def analyze_journal_entry(
     entry_id: str,
