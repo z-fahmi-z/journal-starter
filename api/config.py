@@ -36,7 +36,7 @@ class Settings(BaseSettings):
         description="PostgreSQL database port.",
     )
 
-    database_url: str | None = Field(
+    database_url: str | None | None = Field(
         default=None,
         description="PostgreSQL connection URL (computed from POSTGRES_* variables).",
     )
