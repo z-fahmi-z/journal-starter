@@ -1,5 +1,4 @@
 from functools import lru_cache
-from typing import Optional
 from urllib.parse import quote_plus
 
 from pydantic import Field, field_validator
@@ -37,7 +36,7 @@ class Settings(BaseSettings):
         description="PostgreSQL database port.",
     )
 
-    database_url: Optional[str] = Field(
+    database_url: str| None = Field(
         default=None,
         description="PostgreSQL connection URL (computed from POSTGRES_* variables).",
     )
