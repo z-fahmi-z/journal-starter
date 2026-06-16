@@ -58,6 +58,7 @@ class Settings(BaseSettings):
         description="Bedrock model ID to use for journal analysis in cloud-native mode.",
     )
     openai_api_key: str = Field(
+        default="",
         description=(
             "API key for any OpenAI-compatible provider. Task 4 uses this to "
             "construct an AsyncOpenAI client; during Tasks 1-3 any non-empty "
