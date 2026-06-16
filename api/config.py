@@ -29,6 +29,7 @@ class Settings(BaseSettings):
         description="PostgreSQL database name.",
     )
     postgres_host: str = Field(
+        default="postgres",
         description="PostgreSQL database host.",
     )
     postgres_port: int = Field(
