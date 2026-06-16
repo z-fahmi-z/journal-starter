@@ -29,6 +29,7 @@ class Settings(BaseSettings):
         description="PostgreSQL database name.",
     )
     postgres_host: str = Field(
+        default="postgres",
         description="PostgreSQL database host.",
     )
     postgres_port: int = Field(
@@ -36,8 +37,8 @@ class Settings(BaseSettings):
         description="PostgreSQL database port.",
     )
 
-    database_url: str | None = Field(
-        default=None,
+    database_url: str = Field(
+        default="",
         description="PostgreSQL connection URL (computed from POSTGRES_* variables).",
     )
     cloud_native: bool = Field(
