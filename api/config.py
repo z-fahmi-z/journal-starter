@@ -36,8 +36,8 @@ class Settings(BaseSettings):
         description="PostgreSQL database port.",
     )
 
-    database_url: str| None = Field(
-        default=None,
+    database_url: str = Field(
+        default="",
         description="PostgreSQL connection URL (computed from POSTGRES_* variables).",
     )
     cloud_native: bool = Field(
