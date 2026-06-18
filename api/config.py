@@ -1,3 +1,4 @@
+import json
 from functools import lru_cache
 from urllib.parse import quote_plus
 
@@ -16,6 +17,14 @@ class Settings(BaseSettings):
     Environment variables are matched case-insensitively, so ``DATABASE_URL``
     in ``.env`` populates ``database_url`` on this model.
     """
+    cloud_native: bool = Field(
+        default=False,
+        description=(
+            "If true, use AWS Bedrock with DeepSeek for journal analysis instead "
+            "of an OpenAI-compatible provider. Requires valid AWS credentials and "
+            "network access to Bedrock."
+        ),
+    )
 
     postgres_user: str = Field(
         default="postgres",
@@ -25,7 +34,7 @@ class Settings(BaseSettings):
         description="PostgreSQL database password.",
     )
     postgres_db: str = Field(
-        default="career_journal",
+        default="journaldb",
         description="PostgreSQL database name.",
     )
     postgres_host: str = Field(
@@ -40,14 +49,6 @@ class Settings(BaseSettings):
     database_url: str = Field(
         default="",
         description="PostgreSQL connection URL (computed from POSTGRES_* variables).",
-    )
-    cloud_native: bool = Field(
-        default=False,
-        description=(
-            "If true, use AWS Bedrock with DeepSeek for journal analysis instead "
-            "of an OpenAI-compatible provider. Requires valid AWS credentials and "
-            "network access to Bedrock."
-        ),
     )
     aws_region: str = Field(
         default="us-east-1",
@@ -87,25 +88,52 @@ class Settings(BaseSettings):
         if v:
             return v
 
-        # Get values from the data being validated
         data = info.data
+        cloud_native = data.get("cloud_native", False)
 
-        user = data.get("postgres_user")
-        password = data.get("postgres_password")
         host = data.get("postgres_host")
         port = data.get("postgres_port", 5432)
         db = data.get("postgres_db")
 
-        # Validate required fields
-        if not all([user, password, host, db]):
+        if not all([host, db]):
             raise ValueError(
-                "Cannot build database_url: missing required POSTGRES_* environment variables. "
-                "Need POSTGRES_USER, POSTGRES_PASSWORD, POSTGRES_HOST, and POSTGRES_DB."
+                "Cannot build database_url: missing POSTGRES_HOST and POSTGRES_DB."
             )
 
-        # Build the URL
-        encoded_password = quote_plus(password)
+        if cloud_native:
+            raw_secret = data.get("postgres_password")
+            if not raw_secret:
+                raise ValueError(
+                    "CLOUD_NATIVE=true requires POSTGRES_PASSWORD to be set. "
+                    "Expected ECS to inject the Secrets Manager value as a JSON string."
+                )
 
+            try:
+                secret = json.loads(raw_secret)
+            except json.JSONDecodeError as e:
+                raise ValueError(
+                    f"CLOUD_NATIVE=true expects POSTGRES_PASSWORD to be a JSON string "
+                    f"injected by ECS Secrets Manager, but got an unparseable value: {e}"
+                ) from e
+
+            if "password" not in secret:
+                raise ValueError(
+                    f"Parsed secret does not contain a 'password' key. "
+                    f"Found keys: {list(secret.keys())}"
+                )
+
+            user = secret.get("username", data.get("postgres_user"))
+            password = secret["password"]
+        else:
+            user = data.get("postgres_user")
+            password = data.get("postgres_password")
+
+            if not all([user, password]):
+                raise ValueError(
+                    "Cannot build database_url: missing POSTGRES_USER or POSTGRES_PASSWORD."
+                )
+
+        encoded_password = quote_plus(password)
         return f"postgresql://{user}:{encoded_password}@{host}:{port}/{db}"
 
 
