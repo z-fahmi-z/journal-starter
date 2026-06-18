@@ -2,7 +2,6 @@ import json
 from datetime import UTC, datetime
 
 import boto3
-from botocore.exceptions import BotoCoreError, NoCredentialsError
 from openai import AsyncOpenAI
 
 from api.config import get_settings
@@ -27,18 +26,6 @@ def _is_cloud_native() -> bool:
     return getattr(settings, "cloud_native", False)
 
 
-def _bedrock_available() -> bool:
-    """Return True if AWS Bedrock is reachable with the current credentials."""
-    if not _is_cloud_native():
-        return False
-
-    try:
-        boto3.client("bedrock", region_name=get_settings().aws_region).list_foundation_models()
-        return True
-    except BotoCoreError, NoCredentialsError, Exception:
-        return False
-
-
 async def _analyze_with_bedrock(entry_id: str, entry_text: str) -> dict:
     """Run the journal analysis via AWS Bedrock (DeepSeek model on Bedrock)."""
     settings = get_settings()
@@ -46,15 +33,18 @@ async def _analyze_with_bedrock(entry_id: str, entry_text: str) -> dict:
 
     prompt_template = _build_prompt(entry_text)
 
-    # DeepSeek model on Bedrock uses a different API format
-    # Using the converse API format which works with DeepSeek models
+    # DeepSeek on Bedrock expects the standard Bedrock converse API format
+    # but with specific structure for the messages
     body = json.dumps(
         {
-            "messages": [{"role": "user", "content": [{"text": prompt_template}]}],
-            "inferenceConfig": {
-                "maxTokens": 1024,
-                "temperature": 0.8,
-            },
+            "messages": [
+                {
+                    "role": "user",
+                    "content": prompt_template,  # Simple string, not a list with text objects
+                }
+            ],
+            "max_tokens": 1024,  # Note: snake_case, not camelCase
+            "temperature": 0.8,
         }
     )
 
@@ -67,10 +57,9 @@ async def _analyze_with_bedrock(entry_id: str, entry_text: str) -> dict:
 
     raw = json.loads(response["body"].read())
 
-    # Extract the response text based on DeepSeek's response format
-    assistant_raw_message = (
-        raw.get("output", {}).get("message", {}).get("content", [{}])[0].get("text", "")
-    )
+    # DeepSeek response format on Bedrock
+    # The response typically has a "choices" array with the completion
+    assistant_raw_message = raw.get("choices", [{}])[0].get("message", {}).get("content", "")
 
     if not assistant_raw_message:
         raise ValueError("Bedrock returned empty content")
@@ -78,7 +67,7 @@ async def _analyze_with_bedrock(entry_id: str, entry_text: str) -> dict:
     analysis = json.loads(assistant_raw_message)
     analysis["entry_id"] = entry_id
     analysis["created_at"] = datetime.now(UTC).isoformat()
-    analysis["model"] = "bedrock-deepseek"
+    analysis["model"] = settings.bedrock_model_id
     return analysis
 
 
@@ -105,7 +94,7 @@ async def _analyze_with_openai(
     analysis = json.loads(assistant_raw_message)
     analysis["entry_id"] = entry_id
     analysis["created_at"] = datetime.now(UTC).isoformat()
-    analysis["model"] = "openai-compatible"
+    analysis["model"] = model
     return analysis
 
 
@@ -135,12 +124,6 @@ async def analyze_journal_entry(
     entry_text: str,
     client: AsyncOpenAI | None = None,
 ) -> dict:
-    """Analyze a journal entry using either Bedrock (DeepSeek) or OpenAI-compatible LLM."""
-
     if _is_cloud_native():
-        # Cloud-native mode: Use AWS Bedrock with DeepSeek
-        if not _bedrock_available():
-            raise RuntimeError("Cannot reach AWS Bedrock service.")
         return await _analyze_with_bedrock(entry_id, entry_text)
-    # Local development mode: Use OpenAI-compatible endpoint
     return await _analyze_with_openai(entry_id, entry_text, client)
