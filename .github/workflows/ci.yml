@@ -21,7 +21,6 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  PUSH_TO_ECR: 'true'
   IMAGE_NAME: 'journal-api'
   DOCKER_REGISTRY: 'docker.io'
 
@@ -86,7 +85,7 @@ jobs:
           username: ${{ vars.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_TOKEN }}
       - name: Push to ECR
-        if: env.PUSH_TO_ECR == 'true'
+        if: vars.PUSH_TO_ECR == 'true'
         uses: ./.github/actions/05-push-ecr
         with:
           image-ref: ${{ steps.build.outputs.image-ref }}
