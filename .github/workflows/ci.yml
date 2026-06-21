@@ -39,9 +39,9 @@ jobs:
       postgres:
         image: postgres:16
         env:
-          POSTGRES_USER: test_postgres
-          POSTGRES_PASSWORD: test_postgres
-          POSTGRES_DB: test_career_journal
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: career_journal
         ports:
           - 5432:5432
         options: >-
@@ -50,10 +50,10 @@ jobs:
           --health-timeout 5s
           --health-retries 5
     env:
-      POSTGRES_USER: test_postgres
-      POSTGRES_PASSWORD: test_postgres
-      POSTGRES_DB: test_career_journal
-      DATABASE_URL: postgresql://test_postgres:test_postgres@localhost:5432/test_career_journal
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: career_journal
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/career_journal
       OPENAI_API_KEY: test-placeholder-not-used-by-mock
     steps:
       - uses: actions/checkout@v4
