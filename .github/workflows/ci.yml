@@ -8,6 +8,7 @@ on:
       - 'Dockerfile'
       - 'pyproject.toml'
       - '.github/workflows/**'
+      - '.github/actions/**'
     branches: [main, feature/cicd-pipeline]
   pull_request:
     branches: [main]
