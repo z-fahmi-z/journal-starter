@@ -20,7 +20,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  PUSH_TO_ECR: 'false'
+  PUSH_TO_ECR: 'true'
   IMAGE_NAME: 'journal-api'
   DOCKER_REGISTRY: 'docker.io'
 
