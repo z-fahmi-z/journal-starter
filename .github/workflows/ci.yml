@@ -82,7 +82,7 @@ jobs:
           image-ref: ${{ steps.build.outputs.image-ref }}
           repository: ${{ vars.DOCKER_USERNAME }}/${{ env.IMAGE_NAME }}
           tag: ${{ github.sha }}
-          username: ${{ secrets.DOCKER_USERNAME }}
+          username: ${{ vars.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_TOKEN }}
       - name: Push to ECR
         if: env.PUSH_TO_ECR == 'true'
