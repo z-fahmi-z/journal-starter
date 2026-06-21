@@ -1,8 +1,14 @@
-name: CI
+name: CI Pipeline
 
 on:
   push:
-    branches: [main]
+    paths:
+      - 'api/**'
+      - '**.sql'
+      - 'Dockerfile'
+      - 'pyproject.toml'
+      - '.github/workflows/**'
+    branches: [main, feature/cicd-pipeline]
   pull_request:
     branches: [main]
 
@@ -13,44 +19,28 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  PUSH_TO_ECR: 'false'
+  IMAGE_NAME: 'journal-api'
+  DOCKER_REGISTRY: 'docker.io'
+
 jobs:
   lint:
     name: Lint
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-
-      - name: Install uv
-        uses: astral-sh/setup-uv@v6
-        with:
-          enable-cache: true
-
-      - name: Set up Python
-        run: uv python install 3.14
-
-      - name: Install dependencies
-        run: uv sync --locked --all-extras
-
-      - name: Ruff check
-        run: uv run ruff check .
-
-      - name: Ruff format check
-        run: uv run ruff format --check .
-
-      - name: Pyright type check
-        run: uv run pyright
+      - uses: ./.github/actions/01-lint
 
   test:
     name: Test
     runs-on: ubuntu-latest
-
     services:
       postgres:
         image: postgres:16
         env:
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: career_journal
+          POSTGRES_USER: test_postgres
+          POSTGRES_PASSWORD: test_postgres
+          POSTGRES_DB: test_career_journal
         ports:
           - 5432:5432
         options: >-
@@ -58,36 +48,46 @@ jobs:
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
-
     env:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: career_journal
-      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/career_journal
-      # Required by api.config.Settings so the app boots. Tests never call a
-      # real LLM — Task 4 uses an injected MockAsyncOpenAI client — so any
-      # non-empty value works.
-      OPENAI_API_KEY: ci-placeholder-not-used-by-mock
+      POSTGRES_USER: test_postgres
+      POSTGRES_PASSWORD: test_postgres
+      POSTGRES_DB: test_career_journal
+      DATABASE_URL: postgresql://test_postgres:test_postgres@localhost:5432/test_career_journal
+      OPENAI_API_KEY: test-placeholder-not-used-by-mock
+    steps:
+      - uses: ./.github/actions/02-test
 
+  build-and-push:
+    name: Build and Push
+    runs-on: ubuntu-latest
+    needs: [lint, test]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    permissions:
+      contents: read
+      id-token: write
     steps:
       - uses: actions/checkout@v4
-
-      - name: Install uv
-        uses: astral-sh/setup-uv@v6
+      - uses: ./.github/actions/03-build
+        id: build
         with:
-          enable-cache: true
-
-      - name: Set up Python
-        run: uv python install 3.14
-
-      - name: Install dependencies
-        run: uv sync --locked --all-extras
-
-      - name: Initialize database schema
-        run: |
-          PGPASSWORD=postgres psql \
-            -h localhost -U postgres -d career_journal \
-            -f ./db/database_setup.sql
-
-      - name: Run tests
-        run: uv run pytest -v
+          image-name: ${{ env.IMAGE_NAME }}
+          image-tag: ${{ github.sha }}
+          dockerfile-path: ./Dockerfile
+          context: .
+      - name: Push to Docker Hub
+        uses: ./.github/actions/04-push-docker
+        with:
+          image-ref: ${{ steps.build.outputs.image-ref }}
+          repository: ${{ vars.DOCKER_USERNAME }}/${{ env.IMAGE_NAME }}
+          tag: ${{ github.sha }}
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_TOKEN }}
+      - name: Push to ECR
+        if: env.PUSH_TO_ECR == 'true'
+        uses: ./.github/actions/05-push-ecr
+        with:
+          image-ref: ${{ steps.build.outputs.image-ref }}
+          aws-region: ${{ vars.AWS_REGION }}
+          ecr-repository: ${{ vars.ECR_REPOSITORY }}
+          image-tag: ${{ github.sha }}
+          role-to-assume: ${{ secrets.AWS_ECR_ROLE_ARN }}
