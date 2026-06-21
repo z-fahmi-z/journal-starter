@@ -1,0 +1,81 @@
+name: 'Docker Push'
+description: 'Tag and push a Docker image to Docker Hub or other OCI registry'
+
+inputs:
+  image-ref:
+    description: 'Local image reference to push (e.g. api:sha123)'
+    required: true
+
+  registry:
+    description: 'Registry hostname (e.g., docker.io, ghcr.io)'
+    required: false
+    default: 'docker.io'
+
+  repository:
+    description: 'Target repository (e.g., myorg/myapp)'
+    required: true
+
+  tag:
+    description: 'Image tag'
+    required: false
+    default: ${{ github.sha }}
+
+  username:
+    description: 'Registry username'
+    required: true
+
+  password:
+    description: 'Registry password or token'
+    required: true
+
+  push-latest:
+    description: 'Also tag and push as latest'
+    required: false
+    default: 'true'
+
+outputs:
+  image-uri:
+    description: 'Full pushed image URI (registry/repository:tag)'
+    value: ${{ steps.push.outputs.image-uri }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Validate local image exists
+      shell: bash
+      run: |
+        if ! docker image inspect "${{ inputs.image-ref }}" >/dev/null 2>&1; then
+          echo "Error: Local image '${{ inputs.image-ref }}' not found"
+          exit 1
+        fi
+
+    - name: Log in to Docker registry
+      uses: docker/login-action@v3
+      with:
+        registry: ${{ inputs.registry }}
+        username: ${{ inputs.username }}
+        password: ${{ inputs.password }}
+
+    - name: Tag and push image
+      id: push
+      shell: bash
+      run: |
+        set -euo pipefail
+
+        REGISTRY_PREFIX=""
+        if [ -n "${{ inputs.registry }}" ]; then
+          REGISTRY_PREFIX="${{ inputs.registry }}/"
+        fi
+
+        TARGET="${REGISTRY_PREFIX}${{ inputs.repository }}:${{ inputs.tag }}"
+
+        docker tag "${{ inputs.image-ref }}" "$TARGET"
+        docker push "$TARGET"
+
+        if [ "${{ inputs.push-latest }}" = "true" ]; then
+          LATEST="${REGISTRY_PREFIX}${{ inputs.repository }}:latest"
+          docker tag "${{ inputs.image-ref }}" "$LATEST"
+          docker push "$LATEST"
+        fi
+
+        echo "image-uri=$TARGET" >> "$GITHUB_OUTPUT"
