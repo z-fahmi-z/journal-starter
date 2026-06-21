@@ -56,6 +56,7 @@ jobs:
       DATABASE_URL: postgresql://test_postgres:test_postgres@localhost:5432/test_career_journal
       OPENAI_API_KEY: test-placeholder-not-used-by-mock
     steps:
+      - uses: actions/checkout@v4
       - uses: ./.github/actions/02-test
 
   build-and-push:
