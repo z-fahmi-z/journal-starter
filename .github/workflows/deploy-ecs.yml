@@ -1,0 +1,19 @@
+name: CD — ECS Blue-Green
+
+on:
+  workflow_dispatch:
+    inputs:
+      image-tag:
+        description: 'Image tag to deploy'
+        required: false
+        default: ''
+
+jobs:
+  deploy:
+    name: Trigger test 
+    runs-on: ubuntu-latest
+    steps:
+      - name: Echo inputs
+        run: |
+          echo "Image tag:   ${{ github.event.inputs.image-tag || github.sha }}"
+          echo "Triggered by: ${{ github.actor }}"
